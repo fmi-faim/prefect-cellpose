@@ -1,0 +1,4 @@
+cpr @ git+https://github.com/fmi-faim/custom-prefect-result@v0.1.1
+prefect == 2.7.10
+prefect-dask
+dask-jobqueue
