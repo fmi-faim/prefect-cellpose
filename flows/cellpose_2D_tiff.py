@@ -6,6 +6,7 @@ from typing import Any, Optional
 
 import cellpose.models
 import numpy as np
+import skimage
 from cellpose import models
 from cpr.image.ImageSource import ImageSource
 from cpr.image.ImageTarget import ImageTarget
@@ -38,6 +39,17 @@ class Cellpose(BaseModel):
     diameter: float = 40.0
     flow_threshold: float = 0.4
     cell_probability_threshold: float = 0.0
+    resample: bool = True
+    remove_touching_border: bool = False
+
+
+def remove_border_objects(image: np.ndarray) -> np.ndarray:
+    """Remove objects touching the border of the image."""
+    shape = {0, *image.shape}
+    for prop in skimage.measure.regionprops(image):
+        if bool(shape & {*prop.bbox}):
+            image = np.where(image == prop.label, 0, image)
+    return image
 
 
 @task(cache_key_fn=task_input_hash)
@@ -84,32 +96,52 @@ def exlude_semaphore_and_model_task_input_hash(
 
 @task(cache_key_fn=exlude_semaphore_and_model_task_input_hash)
 def predict(
-    img, model, cellpose_parameter, output_format, gpu_sem: threading.Semaphore
+    img: ImageSource,
+    model,
+    cellpose_parameter,
+    output_format,
+    gpu_sem: threading.Semaphore,
 ):
-    get_run_logger().info("Started using GPU.")
-    data = img.get_data()
+    logger = get_run_logger()
+
     metadata = img.get_metadata()
     axes = metadata["axes"]
-    if data.ndim == 2:
-        data = data[np.newaxis]
-        axes = "C" + axes
+
+    if cellpose_parameter.seg_channel == cellpose_parameter.nuclei_channel:
+        img_data = img.get_data()
+        if img_data.ndim == 3:
+            img_data = np.moveaxis(img_data, axes.index("C"), 0)
+            img_data = img_data[cellpose_parameter.seg_channel]
+            img_data = img_data[np.newaxis]
+        elif img_data.ndim == 2:
+            img_data = img_data[np.newaxis]
+        else:
+            logger.error(f"{img_data.ndim} not supported.")
+    else:
+        img_data = img.get_data()
+        if img_data.ndim == 3:
+            img_data = np.moveaxis(img_data, axes.index("C"), 0)
+            img_data = np.concatenate(
+                [
+                    img_data[cellpose_parameter.seg_channel],
+                    img_data[cellpose_parameter.nuclei_channel],
+                ],
+                axis=0,
+            )
+        else:
+            logger.error(f"{img_data.ndim} not supported.")
 
     metadata["imagej"] = output_format.imagej_compatible
-    metadata["Channel"] = {"Name": list(range(axes.index("C")))}
-    channel_axis = axes.index("C")
 
     try:
         gpu_sem.acquire()
         mask, _, _, _ = model.eval(
-            data,
+            img_data,
             diameter=cellpose_parameter.diameter,
             flow_threshold=cellpose_parameter.flow_threshold,
             cellprob_threshold=cellpose_parameter.cell_probability_threshold,
-            channels=[
-                cellpose_parameter.seg_channel,
-                cellpose_parameter.nuclei_channel,
-            ],
-            channel_axis=channel_axis,
+            channels=[0, 1],
+            channel_axis=0,
         )
     except Exception as e:
         raise e
@@ -121,6 +153,9 @@ def predict(
         metadata=metadata,
         resolution=img.get_resolution(),
     )
+
+    if cellpose_parameter.remove_touching_border:
+        mask = remove_border_objects(mask)
 
     pred.set_data(mask.astype(np.uint16))
 
