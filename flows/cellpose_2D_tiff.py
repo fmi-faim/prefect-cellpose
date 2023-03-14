@@ -208,7 +208,6 @@ def submit_flows(
     output_format: OutputFormat = OutputFormat(),
     chunk_size: int = 500,
 ):
-
     image_dicts = [i.serialize() for i in images]
 
     predictions = []
