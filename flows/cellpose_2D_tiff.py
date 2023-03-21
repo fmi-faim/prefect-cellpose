@@ -167,7 +167,7 @@ def predict(
         pred_mask.set_data(mask.astype(np.uint16))
 
         pred_flows = NumpyTarget.from_path(
-            join(output_format.output_dir, img.get_name() + "_flows")
+            join(output_format.output_dir, img.get_name() + "_flows.npy")
         )
         pred_flows.set_data(flows)
 
@@ -183,7 +183,7 @@ def predict(
         return pred_mask, None
     elif not cellpose_parameter.save_labeling and cellpose_parameter.save_flows:
         pred_flows = NumpyTarget.from_path(
-            join(output_format.output_dir, img.get_name() + "_flows")
+            join(output_format.output_dir, img.get_name() + "_flows.npy")
         )
         pred_flows.set_data(flows)
 
