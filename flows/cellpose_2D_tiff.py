@@ -332,7 +332,7 @@ def validate_parameters(
 
 
 with open(
-    join("src/prefect_faim_hcs/flows/molecular_devices_to_ome_zarr_3d.md"),
+    join("flows/cellpose_2D_tiff.md"),
     encoding="UTF-8",
 ) as f:
     description = f.read()
