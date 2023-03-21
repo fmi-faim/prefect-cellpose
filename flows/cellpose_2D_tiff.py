@@ -1,7 +1,8 @@
+import json
 import os
 import re
 import threading
-from os.path import join
+from os.path import exists, join
 from typing import Any, Optional
 
 import cellpose.models
@@ -12,6 +13,9 @@ from cpr.image.ImageSource import ImageSource
 from cpr.image.ImageTarget import ImageTarget
 from cpr.Serializer import cpr_serializer
 from cpr.utilities.utilities import task_input_hash
+from faim_prefect.mamba import log_infrastructure
+from faim_prefect.parallelization.utils import wait_for_task_run
+from faim_prefect.parameter import User
 from prefect import flow, get_client, get_run_logger, task
 from prefect.client.schemas import FlowRun
 from prefect.context import TaskRunContext
@@ -192,11 +196,19 @@ def run_cellpose_2D_tiff(
             )
         )
 
-        while len(buffer) >= 4:
-            predictions.append(buffer.pop(0).result())
+        wait_for_task_run(
+            results=predictions,
+            buffer=buffer,
+            max_buffer_length=4,
+            result_insert_fn=lambda r: r.result(),
+        )
 
-    while len(buffer) > 0:
-        predictions.append(buffer.pop(0).result())
+    wait_for_task_run(
+        results=predictions,
+        buffer=buffer,
+        max_buffer_length=0,
+        result_insert_fn=lambda r: r.result(),
+    )
 
     return predictions
 
@@ -227,37 +239,120 @@ def submit_flows(
     return predictions
 
 
+def validate_parameters(
+    user: User,
+    input_data: InputData,
+    output_format: OutputFormat,
+    cellpose_parameters: Cellpose,
+    parallelization: int,
+    n_imgs_per_job: int,
+):
+    logger = get_run_logger()
+    base_dir = LocalFileSystem.load("base-output-directory").basepath
+    group = user.group.value
+    if not exists(join(base_dir, group)):
+        logger.error(f"Group '{group}' does not exist in '{base_dir}'.")
+
+    if not exists(input_data.input_dir):
+        logger.error(f"Input directory '{input_data.input_dir}' does not " f"exist.")
+
+    if not bool(re.match("[XYC]+", input_data.axes)):
+        logger.error("Axes is only allowed to contain 'XYC'.")
+
+    if not exists(output_format.output_dir):
+        logger.error(
+            f"Output directory '{output_format.output_dir}' does " f"not exist."
+        )
+
+    if parallelization < 1:
+        logger.error(f"parallelization = {parallelization}. Must be >= 1.")
+
+    if n_imgs_per_job < 1:
+        logger.error(f"n_imgs_per_job = {n_imgs_per_job}. Must be >= 1.")
+
+    run_dir = join(
+        base_dir,
+        group,
+        user.name,
+        "prefect-runs",
+        "cellpose",
+        user.run_name.replace(" ", "-"),
+    )
+
+    parameters = {
+        "user": {
+            "name": user.name,
+            "group": group,
+            "run_name": user.run_name,
+        },
+        "input_data": input_data.dict(),
+        "output_format": output_format.dict(),
+        "cellpose_parameters": cellpose_parameters.dict(),
+        "parallelization": parallelization,
+        "n_imgs_per_job": n_imgs_per_job,
+    }
+
+    os.makedirs(run_dir, exist_ok=True)
+    with open(join(run_dir, "parameters.json"), "w") as f:
+        f.write(json.dumps(parameters, indent=4))
+
+    return run_dir
+
+
+with open(
+    join("src/prefect_faim_hcs/flows/molecular_devices_to_ome_zarr_3d.md"),
+    encoding="UTF-8",
+) as f:
+    description = f.read()
+
+
 @flow(
     name="Cellpose inference 2D [tiff]",
+    description=description,
     cache_result_in_memory=False,
     persist_result=True,
     result_serializer=cpr_serializer(),
     result_storage=LocalFileSystem.load("cellpose"),
 )
 def cellpose_2D_tiff(
-    input_parameter: InputData = InputData(),
+    user: User,
+    input_data: InputData = InputData(),
     output_format: OutputFormat = OutputFormat(),
-    cellpose_parameter: Cellpose = Cellpose(),
-    parallel_jobs: int = 1,
+    cellpose_parameters: Cellpose = Cellpose(),
+    parallelization: int = 1,
     n_imgs_per_job: int = 500,
 ) -> list[ImageTarget]:
+
+    run_dir = validate_parameters(
+        user=user,
+        input_data=input_data,
+        output_format=output_format,
+        cellpose_parameters=cellpose_parameters,
+        parallelization=parallelization,
+        n_imgs_per_job=n_imgs_per_job,
+    )
+
+    logger = get_run_logger()
+    logger.info(f"Run logs are written to: {run_dir}")
+    logger.info(f"Segmentations are saved in:" f" {output_format.output_dir}")
+
     imgs = list_images(
-        input_dir=input_parameter.input_dir,
-        pattern=input_parameter.pattern,
-        pixel_resolution_um=input_parameter.xy_pixelsize_um,
-        axes=input_parameter.axes,
+        input_dir=input_data.input_dir,
+        pattern=input_data.pattern,
+        pixel_resolution_um=input_data.xy_pixelsize_um,
+        axes=input_data.axes,
     )
 
     n_imgs = len(imgs)
-    split = n_imgs // parallel_jobs
+    split = n_imgs // parallelization
     start = 0
 
     runs = []
-    for i in range(parallel_jobs - 1):
+    for i in range(parallelization - 1):
         runs.append(
             submit_flows.submit(
                 images=imgs[start : start + split],
-                cellpose_parameter=cellpose_parameter,
+                cellpose_parameter=cellpose_parameters,
                 output_format=output_format,
                 chunk_size=n_imgs_per_job,
             )
@@ -267,7 +362,7 @@ def cellpose_2D_tiff(
     runs.append(
         submit_flows.submit(
             images=imgs[start:],
-            cellpose_parameter=cellpose_parameter,
+            cellpose_parameter=cellpose_parameters,
             output_format=output_format,
             chunk_size=n_imgs_per_job,
         )
@@ -276,6 +371,8 @@ def cellpose_2D_tiff(
     segmentations = []
     for run in runs:
         segmentations.extend(run.result())
+
+    log_infrastructure(run_dir)
 
     return segmentations
 
