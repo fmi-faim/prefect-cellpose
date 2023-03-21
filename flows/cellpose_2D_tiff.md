@@ -26,6 +26,8 @@ The provided tiff-files must be 2D and can have an optional channel axis.
     * `cell_probability_threshold`: Threshold used to determine ROIs.
     * `resample`: Setting this to `true` will create smoother segmentations.
     * `remove_touching_border`: Remove ROIs touching the image border.
+    * `save_labeling`: Save label image (uint16).
+    * `save_flows`: Save cellpose flows (numpy-array).
 * `parallelization`: How many cellpose jobs are running in parallel. This number if optimized for our setup. __Do not change this.__
 * `n_imgs_per_job`: Number of images processed by each cellpose job. This number if optimized for our setup. __Do not change this.__
 

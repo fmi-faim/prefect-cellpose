@@ -11,6 +11,7 @@ import skimage
 from cellpose import models
 from cpr.image.ImageSource import ImageSource
 from cpr.image.ImageTarget import ImageTarget
+from cpr.numpy.NumpyTarget import NumpyTarget
 from cpr.Serializer import cpr_serializer
 from cpr.utilities.utilities import task_input_hash
 from faim_prefect.mamba import log_infrastructure
@@ -45,6 +46,8 @@ class Cellpose(BaseModel):
     cell_probability_threshold: float = 0.0
     resample: bool = True
     remove_touching_border: bool = False
+    save_labeling: bool = True
+    save_flows: bool = False
 
 
 def remove_border_objects(image: np.ndarray) -> np.ndarray:
@@ -102,8 +105,8 @@ def exlude_semaphore_and_model_task_input_hash(
 def predict(
     img: ImageSource,
     model,
-    cellpose_parameter,
-    output_format,
+    cellpose_parameter: Cellpose,
+    output_format: OutputFormat,
     gpu_sem: threading.Semaphore,
 ):
     logger = get_run_logger()
@@ -139,7 +142,7 @@ def predict(
 
     try:
         gpu_sem.acquire()
-        mask, _, _, _ = model.eval(
+        mask, flows, _, _ = model.eval(
             img_data,
             diameter=cellpose_parameter.diameter,
             flow_threshold=cellpose_parameter.flow_threshold,
@@ -152,18 +155,43 @@ def predict(
     finally:
         gpu_sem.release()
 
-    pred = ImageTarget.from_path(
-        join(output_format.output_dir, img.get_name()),
-        metadata=metadata,
-        resolution=img.get_resolution(),
-    )
-
     if cellpose_parameter.remove_touching_border:
         mask = remove_border_objects(mask)
 
-    pred.set_data(mask.astype(np.uint16))
+    if cellpose_parameter.save_labeling and cellpose_parameter.save_flows:
+        pred_mask = ImageTarget.from_path(
+            join(output_format.output_dir, img.get_name()),
+            metadata=metadata,
+            resolution=img.get_resolution(),
+        )
+        pred_mask.set_data(mask.astype(np.uint16))
 
-    return pred
+        pred_flows = NumpyTarget.from_path(
+            join(output_format.output_dir, img.get_name() + "_flows")
+        )
+        pred_flows.set_data(flows)
+
+        return pred_mask, pred_flows
+    elif cellpose_parameter.save_labeling and not cellpose_parameter.save_flows:
+        pred_mask = ImageTarget.from_path(
+            join(output_format.output_dir, img.get_name()),
+            metadata=metadata,
+            resolution=img.get_resolution(),
+        )
+        pred_mask.set_data(mask.astype(np.uint16))
+
+        return pred_mask, None
+    elif not cellpose_parameter.save_labeling and cellpose_parameter.save_flows:
+        pred_flows = NumpyTarget.from_path(
+            join(output_format.output_dir, img.get_name() + "_flows")
+        )
+        pred_flows.set_data(flows)
+
+        return None, pred_flows
+    else:
+        logger.error(
+            "No prediction is saved. Please select 'save_labeling' " "or 'save_flows'."
+        )
 
 
 @flow(
@@ -183,6 +211,10 @@ def run_cellpose_2D_tiff(
 
     model = models.Cellpose(gpu=True, model_type=cellpose_parameter.model)
 
+    def unpack(future):
+        labeling, flows = future.result()
+        return {"mask": labeling, "flows": flows}
+
     predictions: list[ImageTarget] = []
     buffer = []
     for img in images:
@@ -200,14 +232,14 @@ def run_cellpose_2D_tiff(
             results=predictions,
             buffer=buffer,
             max_buffer_length=4,
-            result_insert_fn=lambda r: r.result(),
+            result_insert_fn=unpack,
         )
 
     wait_for_task_run(
         results=predictions,
         buffer=buffer,
         max_buffer_length=0,
-        result_insert_fn=lambda r: r.result(),
+        result_insert_fn=unpack,
     )
 
     return predictions
