@@ -59,7 +59,7 @@ def remove_border_objects(image: np.ndarray) -> np.ndarray:
     return image
 
 
-@task(cache_key_fn=task_input_hash)
+@task(cache_key_fn=task_input_hash, refresh_cache=True)
 def list_images(
     input_dir: str = "/path/to/input_dir",
     pattern: str = ".*.tif",
@@ -149,6 +149,7 @@ def predict(
             cellprob_threshold=cellpose_parameter.cell_probability_threshold,
             channels=[0, 1],
             channel_axis=0,
+            compute_masks=cellpose_parameter.save_labeling,
         )
     except Exception as e:
         raise e
@@ -166,10 +167,13 @@ def predict(
         )
         pred_mask.set_data(mask.astype(np.uint16))
 
-        pred_flows = NumpyTarget.from_path(
-            join(output_format.output_dir, img.get_name() + "_flows.npy")
-        )
-        pred_flows.set_data(flows)
+        pred_flows = []
+        for i, cellpose_flow in enumerate(flows):
+            pred_flow = NumpyTarget.from_path(
+                join(output_format.output_dir, img.get_name() + f"_flow-" f"{i}.npy")
+            )
+            pred_flow.set_data(cellpose_flow)
+            pred_flows.append(pred_flow)
 
         return pred_mask, pred_flows
     elif cellpose_parameter.save_labeling and not cellpose_parameter.save_flows:
@@ -182,10 +186,13 @@ def predict(
 
         return pred_mask, None
     elif not cellpose_parameter.save_labeling and cellpose_parameter.save_flows:
-        pred_flows = NumpyTarget.from_path(
-            join(output_format.output_dir, img.get_name() + "_flows.npy")
-        )
-        pred_flows.set_data(flows)
+        pred_flows = []
+        for i, cellpose_flow in enumerate(flows):
+            pred_flow = NumpyTarget.from_path(
+                join(output_format.output_dir, img.get_name() + f"_flow-" f"{i}.npy")
+            )
+            pred_flow.set_data(cellpose_flow)
+            pred_flows.append(pred_flow)
 
         return None, pred_flows
     else:
