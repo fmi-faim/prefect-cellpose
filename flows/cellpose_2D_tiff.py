@@ -298,10 +298,7 @@ def validate_parameters(
     if not bool(re.match("[XYC]+", input_data.axes)):
         logger.error("Axes is only allowed to contain 'XYC'.")
 
-    if not exists(output_format.output_dir):
-        logger.error(
-            f"Output directory '{output_format.output_dir}' does " f"not exist."
-        )
+    os.makedirs(output_format.output_dir, exist_ok=True)
 
     if parallelization < 1:
         logger.error(f"parallelization = {parallelization}. Must be >= 1.")
