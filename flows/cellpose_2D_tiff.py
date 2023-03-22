@@ -7,7 +7,6 @@ from typing import Any, Optional
 
 import cellpose.models
 import numpy as np
-import skimage
 from cellpose import models
 from cpr.image.ImageSource import ImageSource
 from cpr.image.ImageTarget import ImageTarget
@@ -45,18 +44,8 @@ class Cellpose(BaseModel):
     flow_threshold: float = 0.4
     cell_probability_threshold: float = 0.0
     resample: bool = True
-    remove_touching_border: bool = False
     save_labeling: bool = True
     save_flows: bool = False
-
-
-def remove_border_objects(image: np.ndarray) -> np.ndarray:
-    """Remove objects touching the border of the image."""
-    shape = {0, *image.shape}
-    for prop in skimage.measure.regionprops(image):
-        if bool(shape & {*prop.bbox}):
-            image = np.where(image == prop.label, 0, image)
-    return image
 
 
 @task(cache_key_fn=task_input_hash, refresh_cache=True)
@@ -155,9 +144,6 @@ def predict(
         raise e
     finally:
         gpu_sem.release()
-
-    if cellpose_parameter.remove_touching_border:
-        mask = remove_border_objects(mask)
 
     if cellpose_parameter.save_labeling and cellpose_parameter.save_flows:
         pred_mask = ImageTarget.from_path(

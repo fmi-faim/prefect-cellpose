@@ -8,7 +8,7 @@ The provided tiff-files must be 2D and can have an optional channel axis.
 * `user`:
     * `name`: Name of the user.
     * `group`: Group name of the user.
-    * `run_name`: Name of processing run.
+* `run_name`: Name of processing run.
 * `input_data`:
     * `input_dir`: Input directory containing the 2D+Channel tiff files.
     * `pattern`: A pattern to filter the tiff files.
@@ -25,7 +25,6 @@ The provided tiff-files must be 2D and can have an optional channel axis.
     * `flow_threshold`: Maximum allowed error of the flows for each mask.
     * `cell_probability_threshold`: Threshold used to determine ROIs.
     * `resample`: Setting this to `true` will create smoother segmentations.
-    * `remove_touching_border`: Remove ROIs touching the image border.
     * `save_labeling`: Save label image (uint16).
     * `save_flows`: Save cellpose flows (numpy-array).
 * `parallelization`: How many cellpose jobs are running in parallel. This number if optimized for our setup. __Do not change this.__
