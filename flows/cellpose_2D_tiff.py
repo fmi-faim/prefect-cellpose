@@ -280,6 +280,7 @@ def submit_flows(
 
 def validate_parameters(
     user: User,
+    run_name: str,
     input_data: InputData,
     output_format: OutputFormat,
     cellpose_parameters: Cellpose,
@@ -312,14 +313,13 @@ def validate_parameters(
         user.name,
         "prefect-runs",
         "cellpose",
-        user.run_name.replace(" ", "-"),
+        run_name.replace(" ", "-"),
     )
 
     parameters = {
         "user": {
             "name": user.name,
             "group": group,
-            "run_name": user.run_name,
         },
         "input_data": input_data.dict(),
         "output_format": output_format.dict(),
@@ -352,6 +352,7 @@ with open(
 )
 def cellpose_2D_tiff(
     user: User,
+    run_name: str,
     input_data: InputData = InputData(),
     output_format: OutputFormat = OutputFormat(),
     cellpose_parameters: Cellpose = Cellpose(),
@@ -361,6 +362,7 @@ def cellpose_2D_tiff(
 
     run_dir = validate_parameters(
         user=user,
+        run_name=run_name,
         input_data=input_data,
         output_format=output_format,
         cellpose_parameters=cellpose_parameters,
