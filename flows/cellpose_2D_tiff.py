@@ -142,7 +142,7 @@ def predict(
 
     try:
         gpu_sem.acquire()
-        mask, flows, _, _ = model.eval(
+        mask, flows, _ = model.eval(
             img_data,
             diameter=cellpose_parameter.diameter,
             flow_threshold=cellpose_parameter.flow_threshold,
@@ -216,7 +216,7 @@ def run_cellpose_2D_tiff(
     images = [ImageSource(**d) for d in image_dicts]
     gpu_sem = threading.Semaphore(1)
 
-    model = models.Cellpose(gpu=True, model_type=cellpose_parameter.model)
+    model = models.CellposeModel(gpu=True, pretrained_model=cellpose_parameter.model)
 
     def unpack(future):
         labeling, flows = future.result()
