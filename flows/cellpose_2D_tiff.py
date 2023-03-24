@@ -83,7 +83,7 @@ def exlude_semaphore_and_model_task_input_hash(
     hash_args = {}
     for k, item in arguments.items():
         if (not isinstance(item, threading.Semaphore)) and (
-            not isinstance(item, cellpose.models.Cellpose)
+            not isinstance(item, cellpose.models.CellposeModel)
         ):
             hash_args[k] = item
 
