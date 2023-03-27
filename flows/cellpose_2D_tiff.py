@@ -344,7 +344,6 @@ def cellpose_2D_tiff(
     parallelization: int = 1,
     n_imgs_per_job: int = 500,
 ) -> list[ImageTarget]:
-
     run_dir = validate_parameters(
         user=user,
         run_name=run_name,
