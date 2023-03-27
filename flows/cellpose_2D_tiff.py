@@ -192,7 +192,7 @@ def predict(
     cache_result_in_memory=False,
     persist_result=True,
     result_serializer=cpr_serializer(),
-    result_storage=LocalFileSystem.load("cellpose"),
+    result_storage=LocalFileSystem.load("prefect-cellpose"),
 )
 def run_cellpose_2D_tiff(
     image_dicts: list[dict],
@@ -334,7 +334,7 @@ with open(
     cache_result_in_memory=False,
     persist_result=True,
     result_serializer=cpr_serializer(),
-    result_storage=LocalFileSystem.load("cellpose"),
+    result_storage=LocalFileSystem.load("prefect-cellpose"),
 )
 def cellpose_2D_tiff(
     user: User,
