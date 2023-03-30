@@ -46,6 +46,7 @@ class Cellpose(BaseModel):
     resample: bool = True
     save_labeling: bool = True
     save_flows: bool = False
+    do_3D: bool = False
 
 
 @task(cache_key_fn=task_input_hash, refresh_cache=True)
@@ -139,6 +140,7 @@ def predict(
             channels=[0, 1],
             channel_axis=0,
             compute_masks=cellpose_parameter.save_labeling,
+            do_3D=cellpose_parameter.do_3D,
         )
     except Exception as e:
         raise e
@@ -188,13 +190,13 @@ def predict(
 
 
 @flow(
-    name="Run cellpose inference 2D",
+    name="Run cellpose inference",
     cache_result_in_memory=False,
     persist_result=True,
     result_serializer=cpr_serializer(),
     result_storage=LocalFileSystem.load("prefect-cellpose"),
 )
-def run_cellpose_2D_tiff(
+def run_cellpose_tiff(
     image_dicts: list[dict],
     cellpose_parameter: Cellpose = Cellpose(),
     output_format: OutputFormat = OutputFormat(),
@@ -250,7 +252,7 @@ def submit_flows(
     predictions = []
     for i in range(0, len(images), chunk_size):
         run: FlowRun = run_deployment(
-            name="Run cellpose inference 2D/default",
+            name="Run cellpose inference/default",
             parameters={
                 "image_dicts": image_dicts[i : min(i + chunk_size, len(images))],
                 "cellpose_parameter": cellpose_parameter,
@@ -321,21 +323,21 @@ def validate_parameters(
 
 
 with open(
-    join("flows/cellpose_2D_tiff.md"),
+    join("flows/cellpose_tiff.md"),
     encoding="UTF-8",
 ) as f:
     description = f.read()
 
 
 @flow(
-    name="Cellpose inference 2D [tiff]",
+    name="Cellpose inference [tiff]",
     description=description,
     cache_result_in_memory=False,
     persist_result=True,
     result_serializer=cpr_serializer(),
     result_storage=LocalFileSystem.load("prefect-cellpose"),
 )
-def cellpose_2D_tiff(
+def cellpose_tiff(
     user: User,
     run_name: str,
     input_data: InputData = InputData(),
@@ -400,4 +402,4 @@ def cellpose_2D_tiff(
 
 
 if __name__ == "__main__":
-    cellpose_2D_tiff()
+    cellpose_tiff()

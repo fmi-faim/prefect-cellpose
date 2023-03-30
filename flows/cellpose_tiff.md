@@ -27,6 +27,7 @@ The provided tiff-files must be 2D and can have an optional channel axis.
     * `resample`: Setting this to `true` will create smoother segmentations.
     * `save_labeling`: Save label image (uint16).
     * `save_flows`: Save cellpose flows (numpy-array).
+    * `do_3D`: If cellpose should be run in 3D.
 * `parallelization`: How many cellpose jobs are running in parallel. This number if optimized for our setup. __Do not change this.__
 * `n_imgs_per_job`: Number of images processed by each cellpose job. This number if optimized for our setup. __Do not change this.__
 
