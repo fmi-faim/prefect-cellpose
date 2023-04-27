@@ -201,7 +201,10 @@ def run_cellpose_tiff(
     cellpose_parameter: Cellpose = Cellpose(),
     output_format: OutputFormat = OutputFormat(),
 ):
-    images = [ImageSource(**d) for d in image_dicts]
+    if "data_hash" in image_dicts[0].keys():
+        images = [ImageTarget(**d) for d in image_dicts]
+    else:
+        images = [ImageSource(**d) for d in image_dicts]
     gpu_sem = threading.Semaphore(1)
 
     model = models.CellposeModel(gpu=True, pretrained_model=cellpose_parameter.model)
