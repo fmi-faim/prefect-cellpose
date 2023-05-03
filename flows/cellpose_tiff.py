@@ -172,7 +172,7 @@ def predict(
     output_metadata["axes"] = metadata["axes"].replace("C", "")
     if cellpose_parameter.save_labeling and cellpose_parameter.save_flows:
         pred_mask = ImageTarget.from_path(
-            join(output_format.output_dir, img.get_name()),
+            join(output_format.output_dir, img.get_name() + ".tif"),
             metadata=output_metadata,
             resolution=img.get_resolution(),
             imagej=output_format.imagej_compatible,
@@ -190,7 +190,7 @@ def predict(
         return pred_mask, pred_flows
     elif cellpose_parameter.save_labeling and not cellpose_parameter.save_flows:
         pred_mask = ImageTarget.from_path(
-            join(output_format.output_dir, img.get_name()),
+            join(output_format.output_dir, img.get_name() + ".tif"),
             metadata=output_metadata,
             resolution=img.get_resolution(),
             imagej=output_format.imagej_compatible,
