@@ -169,7 +169,10 @@ def predict(
         gpu_sem.release()
 
     output_metadata = copy(metadata)
-    output_metadata["axes"] = metadata["axes"].replace("C", "")
+    if "C" in output_metadata["axes"]:
+        mask = mask[np.newaxis]
+        mask = np.moveaxis(mask, 0, output_metadata["axes"].index("C"))
+
     if cellpose_parameter.save_labeling and cellpose_parameter.save_flows:
         pred_mask = ImageTarget.from_path(
             join(output_format.output_dir, img.get_name() + ".tif"),
