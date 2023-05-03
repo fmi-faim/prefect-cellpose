@@ -91,6 +91,42 @@ def exlude_semaphore_and_model_task_input_hash(
     return task_input_hash(context, hash_args)
 
 
+def prepare_data_for_single_segmentation_channel(
+    img: ImageSource,
+    seg_channel: int,
+):
+    axes = img.get_metadata()["axes"]
+
+    if "C" in axes:
+        assert 3 <= len(axes) <= 4, f"{axes} not supported."
+        img_data = np.moveaxis(img.get_data(), axes.index("C"), 0)
+        return img_data[seg_channel : seg_channel + 1]
+    else:
+        assert 2 <= len(axes) <= 3, f"{axes} not supported."
+        return img.get_data()[np.newaxis]
+
+
+def prepare_data_for_two_segmentation_channels(
+    img: ImageSource,
+    seg_channel: int,
+    nuc_channel: int,
+):
+    axes = img.get_metadata()["axes"]
+
+    if "C" in axes:
+        assert 3 <= len(axes) <= 4, f"{axes} not supported."
+        img_data = np.moveaxis(img.get_data(), axes.index("C"), 0)
+        return np.concatenate(
+            [
+                img_data[seg_channel : seg_channel + 1],
+                img_data[nuc_channel : nuc_channel + 1],
+            ],
+            axis=0,
+        )
+    else:
+        raise RuntimeError(f"Channel axis is missing: {axes}")
+
+
 @task(cache_key_fn=exlude_semaphore_and_model_task_input_hash)
 def predict(
     img: ImageSource,
@@ -102,31 +138,17 @@ def predict(
     logger = get_run_logger()
 
     metadata = img.get_metadata()
-    axes = metadata["axes"]
 
     if cellpose_parameter.seg_channel == cellpose_parameter.nuclei_channel:
-        img_data = img.get_data()
-        if img_data.ndim == 3:
-            img_data = np.moveaxis(img_data, axes.index("C"), 0)
-            img_data = img_data[cellpose_parameter.seg_channel]
-            img_data = img_data[np.newaxis]
-        elif img_data.ndim == 2:
-            img_data = img_data[np.newaxis]
-        else:
-            logger.error(f"{img_data.ndim} not supported.")
+        img_data = prepare_data_for_single_segmentation_channel(
+            img, seg_channel=cellpose_parameter.seg_channel
+        )
     else:
-        img_data = img.get_data()
-        if img_data.ndim == 3:
-            img_data = np.moveaxis(img_data, axes.index("C"), 0)
-            img_data = np.concatenate(
-                [
-                    img_data[cellpose_parameter.seg_channel],
-                    img_data[cellpose_parameter.nuclei_channel],
-                ],
-                axis=0,
-            )
-        else:
-            logger.error(f"{img_data.ndim} not supported.")
+        img_data = prepare_data_for_two_segmentation_channels(
+            img,
+            seg_channel=cellpose_parameter.seg_channel,
+            nuc_channel=cellpose_parameter.nuclei_channel,
+        )
 
     metadata["imagej"] = output_format.imagej_compatible
 
