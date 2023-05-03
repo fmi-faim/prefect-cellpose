@@ -2,6 +2,7 @@ import json
 import os
 import re
 import threading
+from copy import copy
 from os.path import exists, join
 from typing import Any, Optional
 
@@ -150,8 +151,6 @@ def predict(
             nuc_channel=cellpose_parameter.nuclei_channel,
         )
 
-    metadata["imagej"] = output_format.imagej_compatible
-
     try:
         gpu_sem.acquire()
         mask, flows, _ = model.eval(
@@ -169,11 +168,14 @@ def predict(
     finally:
         gpu_sem.release()
 
+    output_metadata = copy(metadata)
+    output_metadata["axes"] = metadata["axes"].replace("C", "")
     if cellpose_parameter.save_labeling and cellpose_parameter.save_flows:
         pred_mask = ImageTarget.from_path(
             join(output_format.output_dir, img.get_name()),
-            metadata=metadata,
+            metadata=output_metadata,
             resolution=img.get_resolution(),
+            imagej=output_format.imagej_compatible,
         )
         pred_mask.set_data(mask.astype(np.uint16))
 
@@ -189,8 +191,9 @@ def predict(
     elif cellpose_parameter.save_labeling and not cellpose_parameter.save_flows:
         pred_mask = ImageTarget.from_path(
             join(output_format.output_dir, img.get_name()),
-            metadata=metadata,
+            metadata=output_metadata,
             resolution=img.get_resolution(),
+            imagej=output_format.imagej_compatible,
         )
         pred_mask.set_data(mask.astype(np.uint16))
 
@@ -199,7 +202,8 @@ def predict(
         pred_flows = []
         for i, cellpose_flow in enumerate(flows):
             pred_flow = NumpyTarget.from_path(
-                join(output_format.output_dir, img.get_name() + f"_flow-" f"{i}.npy")
+                join(output_format.output_dir, img.get_name() + f"_flow-" f"{i}.npy"),
+                imagej=output_format.imagej_compatible,
             )
             pred_flow.set_data(cellpose_flow)
             pred_flows.append(pred_flow)
@@ -207,7 +211,7 @@ def predict(
         return None, pred_flows
     else:
         logger.error(
-            "No prediction is saved. Please select 'save_labeling' " "or 'save_flows'."
+            "No prediction is saved. Please select 'save_labeling' or 'save_flows'."
         )
 
 
