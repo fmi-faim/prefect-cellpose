@@ -1,3 +1,4 @@
+import gc
 import json
 import os
 import re
@@ -245,6 +246,7 @@ def run_cellpose_tiff(
     predictions: list[ImageTarget] = []
     buffer = []
     for img in images:
+        gc.collect()
         buffer.append(
             predict.submit(
                 img=img,
