@@ -258,7 +258,7 @@ def run_cellpose_tiff(
         wait_for_task_run(
             results=predictions,
             buffer=buffer,
-            max_buffer_length=4,
+            max_buffer_length=2,
             result_insert_fn=unpack,
         )
 
