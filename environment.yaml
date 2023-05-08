@@ -11,6 +11,6 @@ dependencies:
   - pip
   - pip:
     - cellpose
-    - prefect==2.8.7
-    - git+https://github.com/fmi-faim/custom-prefect-result@v0.1.7
+    - prefect==2.10.7
+    - git+https://github.com/fmi-faim/custom-prefect-result@v0.1.9
     - git+https://github.com/fmi-faim/faim-prefect@v0.2.2
