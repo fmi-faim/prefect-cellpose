@@ -31,6 +31,7 @@ class InputData(BaseModel):
     pattern: str = ".*.tif"
     axes: str = "YX"
     xy_pixelsize_um: float = 0.134
+    z_spacing_um: float = 1.0
 
 
 class OutputFormat(BaseModel):
@@ -56,6 +57,7 @@ def list_images(
     input_dir: str = "/path/to/input_dir",
     pattern: str = ".*.tif",
     pixel_resolution_um: float = 0.134,
+    z_spacing_um: float = 0.5,
     axes="CYX",
 ):
     pattern_re = re.compile(pattern)
@@ -63,13 +65,18 @@ def list_images(
     for entry in os.scandir(input_dir):
         if entry.is_file():
             if pattern_re.fullmatch(entry.name):
+                metadata = {
+                    "axes": axes,
+                    "unit": "micron",
+                }
+
+                if "Z" in axes:
+                    metadata["spacing"] = z_spacing_um
+
                 images.append(
                     ImageSource.from_path(
                         entry.path,
-                        metadata={
-                            "axes": axes,
-                            "unit": "micron",
-                        },
+                        metadata=metadata,
                         resolution=[
                             1e4 / pixel_resolution_um,
                             1e4 / pixel_resolution_um,
@@ -317,8 +324,8 @@ def validate_parameters(
     if not exists(input_data.input_dir):
         logger.error(f"Input directory '{input_data.input_dir}' does not " f"exist.")
 
-    if not bool(re.match("[XYC]+", input_data.axes)):
-        logger.error("Axes is only allowed to contain 'XYC'.")
+    if not bool(re.match("[XYZC]+", input_data.axes)):
+        logger.error("Axes is only allowed to contain 'XYZC'.")
 
     os.makedirs(output_format.output_dir, exist_ok=True)
 
@@ -398,6 +405,7 @@ def cellpose_tiff(
         input_dir=input_data.input_dir,
         pattern=input_data.pattern,
         pixel_resolution_um=input_data.xy_pixelsize_um,
+        z_spacing_um=input_data.z_spacing_um,
         axes=input_data.axes,
     )
 
