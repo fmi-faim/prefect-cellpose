@@ -14,6 +14,7 @@ The provided tiff-files must be 2D and can have an optional channel axis.
     * `pattern`: A pattern to filter the tiff files.
     * `axes`: String indicating the axes order of the tiff files.
     * `xy_pixelsize_um`: The pixel-size in micrometers.
+    & `z_spacing_um`: Z spacing in micrometers.
 * `output_format`:
     * `output_dir`: Path to the output directory.
     * `imagej_compatible`: If the output images should be written ImageJ compatible.
