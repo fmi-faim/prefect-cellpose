@@ -127,3 +127,13 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Prefect
+.prefectignore
+deployments/*.yaml
+
+# Cellpose
+models/
+
+# idea
+.idea
